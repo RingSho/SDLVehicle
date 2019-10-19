@@ -21,6 +21,7 @@ import com.smartdevicelink.protocol.enums.FunctionID;
 import com.smartdevicelink.proxy.RPCNotification;
 import com.smartdevicelink.proxy.RPCResponse;
 import com.smartdevicelink.proxy.rpc.DisplayCapabilities;
+import com.smartdevicelink.proxy.rpc.GPSData;
 import com.smartdevicelink.proxy.rpc.GetVehicleData;
 import com.smartdevicelink.proxy.rpc.GetVehicleDataResponse;
 import com.smartdevicelink.proxy.rpc.OnHMIStatus;
@@ -45,6 +46,39 @@ import java.util.Vector;
 
 public class SdlService extends Service {
 
+	/**
+	 -------------------------------------------
+	 ----            山本追加部分             ----
+	 ----  コース情報入力                     ----
+	 ----  峠の情報でデモできないので適当値で    ----
+	 -------------------------------------------
+	 **/
+//	private static final double[][] curve_spot = {{34.254945, 132.672145, 133},
+//												{34.251409, 132.672015, 144},
+//												{34.252860, 132.674055, 144},
+//												{34.255867, 132.675007, 63},
+//												{34.254215, 132.672337, 67},
+//												{34.254000, 132.671385, 94},
+//												{34.254945, 132.672145, 124}};
+
+	private static final double[][] curve_spot = {{-83, 42.5, 66.5},
+			{-80, 42.5, 72},
+			{-78, 42.5, 72},
+			{-75, 42.5, 31.5},
+			{-71, 42.5, 33.5},
+			{-70, 42.5, 57},
+			{-68, 42.5, 62}};
+
+	/**
+	 -------------------------------------------
+	 ----            山本追加部分             ----
+	 ----  ここまで                          ----
+	 ----                                   ----
+	 -------------------------------------------
+	 **/
+
+	private static final double eqs = 0.0005;
+
 	private static final String TAG 					= "SDL Service";
 
 	private static final String APP_NAME 				= "SDL Display";
@@ -57,7 +91,7 @@ public class SdlService extends Service {
 	// TCP/IP transport config
 	// The default port is 12345
 	// The IP is of the machine that is running SDL Core
-	private static final int TCP_PORT = 10662;
+	private static final int TCP_PORT = 18366;
 	private static final String DEV_MACHINE_IP_ADDRESS = "m.sdl.tools";
 
 	// variable to create and call functions of the SyncProxy
@@ -180,7 +214,8 @@ public class SdlService extends Service {
 
                             //回転数が3000以上か、以下で画像を切り替える
                             Integer rpm = onVehicleDataNotification.getRpm();
-                            if(rpm != null) {
+
+							if(rpm != null) {
                                 if (rpm > 3000) {
                                     if (sdlManager.getScreenManager().getPrimaryGraphic().getResourceId() != R.drawable.oldman) {
                                         artwork = new SdlArtwork("oldman.png", FileType.GRAPHIC_PNG, R.drawable.oldman, true);
@@ -195,6 +230,52 @@ public class SdlService extends Service {
                                 }
                             }
 
+
+							/**
+							-------------------------------------------
+							----            山本追加部分             ----
+							----  GPSを取得しカーブ地点との判定        ----
+							----  速度、CRPを取得して危険かの判定      ----
+							-------------------------------------------
+							 **/
+
+							GPSData gps = onVehicleDataNotification.getGps();
+							double longitude = 0.0;
+							double latitude = 0.0;
+							double speed = 0.0;
+
+							if (gps != null) {
+								longitude = gps.getLongitudeDegrees().doubleValue();
+								latitude = gps.getLatitudeDegrees().doubleValue();
+								speed = gps.getSpeed().doubleValue();
+
+							}
+
+							for (int i = 0; i < curve_spot.length; i++){
+								if (Math.abs(curve_spot[i][0]- latitude) < eqs && Math.abs(curve_spot[i][1]- longitude) < eqs){
+									System.out.println("-----------------------------------------");
+									System.out.println("カーブですよーー");
+									System.out.println("-----------------------------------------");
+
+									System.out.println(speed);
+
+									if (speed > curve_spot[i][2]){
+										System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+										System.out.println("危険です！！！！！スピード下げて！！！！");
+										System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+
+									}
+								}
+							}
+
+
+							/**
+							-------------------------------------------
+							----            山本追加部分             ----
+							----  ここまで                          ----
+							----                                   ----
+							-------------------------------------------
+							 **/
                             //テキストを登録する場合
                             sdlManager.getScreenManager().setTextField1("RPM: " + onVehicleDataNotification.getRpm());
 
@@ -227,6 +308,10 @@ public class SdlService extends Service {
 					UnsubscribeVehicleData unsubscribeRequest = new UnsubscribeVehicleData();
 					unsubscribeRequest.setRpm(true);
                     unsubscribeRequest.setPrndl(true);
+					unsubscribeRequest.setGps(true);
+					unsubscribeRequest.setSpeed(true);
+					unsubscribeRequest.setFuelLevel(true);
+
 					unsubscribeRequest.setOnRPCResponseListener(new OnRPCResponseListener() {
 						@Override
 						public void onResponse(int correlationId, RPCResponse response) {
@@ -330,6 +415,7 @@ public class SdlService extends Service {
         keys.add(GetVehicleData.KEY_RPM);
         keys.add(GetVehicleData.KEY_SPEED);
         keys.add(GetVehicleData.KEY_PRNDL);
+        keys.add(GetVehicleData.KEY_SPEED);
         permissionElements.add(new PermissionElement(FunctionID.GET_VEHICLE_DATA, keys));
 
         Map<FunctionID, PermissionStatus> status = sdlManager.getPermissionManager().getStatusOfPermissions(permissionElements);
@@ -338,7 +424,7 @@ public class SdlService extends Service {
         Log.i("Permission", "Allowed:" + status.get(FunctionID.GET_VEHICLE_DATA).getIsRPCAllowed());
 
         //各項目ごとも可能
-        Log.i("Permission", "KEY_RPM　Allowed:" + status.get(FunctionID.GET_VEHICLE_DATA).getAllowedParameters().get(GetVehicleData.KEY_RPM));
+        Log.i("Permission", "KEY_RPM　Allowed:" + status.get(FunctionID.GET_VEHICLE_DATA).getAllowedParameters().get(GetVehicleData.KEY_FUEL_LEVEL));
 
     }
 
@@ -366,7 +452,12 @@ public class SdlService extends Service {
                     SubscribeVehicleData subscribeRequest = new SubscribeVehicleData();
                     subscribeRequest.setRpm(true);                          //エンジン回転数
                     subscribeRequest.setPrndl(true);                        //シフトレーバの状態
-                    subscribeRequest.setOnRPCResponseListener(new OnRPCResponseListener() {
+					subscribeRequest.setGps(true);                        //GPS
+					subscribeRequest.setSpeed(true);                        //速度
+					subscribeRequest.setFuelLevel(true);                        //速度
+
+
+					subscribeRequest.setOnRPCResponseListener(new OnRPCResponseListener() {
                         @Override
                         public void onResponse(int correlationId, RPCResponse response) {
                             if (response.getSuccess()) {
@@ -381,6 +472,12 @@ public class SdlService extends Service {
                 }
             }
 		});
+	}
+	protected void sendMessage(String msg){
+		Intent broadcast = new Intent();
+		broadcast.putExtra("message", msg);
+		broadcast.setAction("DO_ACTION");
+		getBaseContext().sendBroadcast(broadcast);
 	}
 
 }
