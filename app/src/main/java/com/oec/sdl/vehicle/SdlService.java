@@ -44,6 +44,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
+import android.media.MediaPlayer;
+
 public class SdlService extends Service {
 
 	/**
@@ -69,6 +71,14 @@ public class SdlService extends Service {
 			{-70, 42.5, 57},
 			{-68, 42.5, 62}};
 
+
+	private MediaPlayer mp;
+
+	private int[] sounds_curve = {R.raw.level1, R.raw.level2, R.raw.level3, R.raw.level4, R.raw.level5};
+	private int sounds_warning = R.raw.alert;
+	private int[] sounds_alert = {R.raw.sound2, R.raw.alert_sound};
+
+	private Context context = this;
 	/**
 	 -------------------------------------------
 	 ----            山本追加部分             ----
@@ -91,7 +101,7 @@ public class SdlService extends Service {
 	// TCP/IP transport config
 	// The default port is 12345
 	// The IP is of the machine that is running SDL Core
-	private static final int TCP_PORT = 18366;
+	private static final int TCP_PORT = 10999;
 	private static final String DEV_MACHINE_IP_ADDRESS = "m.sdl.tools";
 
 	// variable to create and call functions of the SyncProxy
@@ -256,14 +266,40 @@ public class SdlService extends Service {
 									System.out.println("-----------------------------------------");
 									System.out.println("カーブですよーー");
 									System.out.println("-----------------------------------------");
+									mp = MediaPlayer.create(context, sounds_alert[0]);
+									mp.start();
 
+									if (curve_spot[i][2] < 40) {
+										mp = MediaPlayer.create(context, sounds_curve[4]);
+									}
+									else if (curve_spot[i][2] < 50){
+										mp = MediaPlayer.create(context, sounds_curve[3]);
+									}
+									else if (curve_spot[i][2] < 60){
+										mp = MediaPlayer.create(context, sounds_curve[2]);
+									}
+									else if (curve_spot[i][2] < 70){
+										mp = MediaPlayer.create(context, sounds_curve[1]);
+									}
+									else{
+										mp = MediaPlayer.create(context, sounds_curve[0]);
+									}
+									mp.start();
 									System.out.println(speed);
 
-									if (speed > curve_spot[i][2]){
+
+									while (mp.isPlaying()) {
+									}
+
+									if (speed > curve_spot[i][2] ){
+
 										System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 										System.out.println("危険です！！！！！スピード下げて！！！！");
 										System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
+										mp = MediaPlayer.create(context, sounds_alert[1]);
+										mp.start();
+										mp = MediaPlayer.create(context, sounds_warning);
+										mp.start();
 									}
 								}
 							}
